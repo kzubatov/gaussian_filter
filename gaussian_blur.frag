@@ -1,185 +1,164 @@
 #version 450
-#extension GL_ARB_separate_shader_objects : enable
 
-// #define WINDOW3X3
-// #define WINDOW5X5
-#define WINDOW7X7
-
+layout(constant_id = 0) const int WINDOW_R = 1;
 layout(location = 0) out vec4 color;
 layout(binding = 0) uniform sampler2D colorTex;
 layout(location = 0) in vec2 texCoord;
 
-const float sigma = 3.0f;
+layout(push_constant) uniform params_t {
+    vec2 offset;               //  1.0 / vec2(width, height)
+    float gaussian_divisor;    // -1.0 / (2.0 * sigma_d * sigma_d)
+} params;
 
-#ifdef WINDOW3X3
 void blur3x3()
-{
-  const vec2 offset = vec2(dFdxFine(texCoord.x), dFdyFine(texCoord.y));
-  
-  const vec2 exp_vec = exp(-vec2(0.5, 1) / (sigma * sigma));
-  const float w = 1 + 4 * (exp_vec.x + exp_vec.y);
+{  
+    const vec2 exp_vec = exp(vec2(1.0, 2.0) * params.gaussian_divisor);
+    const float w = 1.0 + 4.0 * (exp_vec.x + exp_vec.y);
 
-  vec3 sum, tmp;
+    vec3 tmp_x, tmp_y; // for exp_vec.x and y parts;
+    vec3 central;
+
+    tmp_y  = textureLod(colorTex, texCoord + params.offset * vec2(-1, -1), 0).rgb;
+    tmp_x  = textureLod(colorTex, texCoord + params.offset * vec2( 0, -1), 0).rgb;
+    tmp_y += textureLod(colorTex, texCoord + params.offset * vec2( 1, -1), 0).rgb;
     
-  tmp  = textureLod(colorTex, texCoord + offset * vec2(-1, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-1, 1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, 1), 0).rgb;
-  sum  = tmp * exp_vec.y;
-  
-  tmp  = textureLod(colorTex, texCoord + offset * vec2(0, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-1, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(0, 1), 0).rgb;
-  sum += tmp * exp_vec.x + textureLod(colorTex, texCoord, 0).rgb;
-
-  color = vec4(sum / w, 1.0);
+    tmp_x += textureLod(colorTex, texCoord + params.offset * vec2(-1,  0), 0).rgb;
+    sum    = textureLod(colorTex, texCoord, 0).rgb;
+    tmp_x += textureLod(colorTex, texCoord + params.offset * vec2( 1,  0), 0).rgb;
+    
+    tmp_y += textureLod(colorTex, texCoord + params.offset * vec2(-1,  1), 0).rgb;
+    tmp_x += textureLod(colorTex, texCoord + params.offset * vec2( 0,  1), 0).rgb;
+    tmp_y += textureLod(colorTex, texCoord + params.offset * vec2( 1,  1), 0).rgb;
+    
+    central += tmp_x * exp_vec.x + tmp_y * exp_vec.y;
+    color = vec4(central / w, 1.0);
 }
-#endif
 
-#ifdef WINDOW5X5
 void blur5x5()
 {
-  const vec2 offset = vec2(dFdxFine(texCoord.x), dFdyFine(texCoord.y));
-  const vec4 exp_vec = exp(-vec4(0.5, 1, 2, 2.5) / (sigma * sigma));
-  const float e_last = exp(-4.0 / (sigma * sigma));
+    const vec4 exp_vec = exp(vec4(1.0, 2.0, 4.0, 5.0) * params.gaussian_divisor);
+    const float exp_last = exp(8.0 * params.gaussian_divisor);
+    const float w = 1.0 + 4.0 * (exp_vec.x + exp_vec.y + exp_vec.z + 2.0 * exp_vec.w + exp_last);
 
-  const float w = 1 + 4 * (exp_vec.x + exp_vec.y + exp_vec.z + 2 * exp_vec.w + e_last);
+    vec3 tmp_x, tmp_y, tmp_z, tmp_w, tmp_last;
+    vec3 central;
 
-  vec3 sum, tmp;
-  
-  tmp  = textureLod(colorTex, texCoord + offset * vec2(-2, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-2, 2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, 2), 0).rgb;
-  sum  = tmp * e_last;
+    tmp_last  = textureLod(colorTex, texCoord + params.offset * vec2(-2, -2), 0).rgb;
+    tmp_w     = textureLod(colorTex, texCoord + params.offset * vec2(-1, -2), 0).rgb;
+    tmp_z     = textureLod(colorTex, texCoord + params.offset * vec2( 0, -2), 0).rgb;
+    tmp_w    += textureLod(colorTex, texCoord + params.offset * vec2( 1, -2), 0).rgb;
+    tmp_last += textureLod(colorTex, texCoord + params.offset * vec2( 2, -2), 0).rgb;
 
-  tmp  = textureLod(colorTex, texCoord + offset * vec2(-1, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-2, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-2, 1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, 1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-1, 2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, 2), 0).rgb;
-  sum += tmp * exp_vec.w;
+    tmp_w    += textureLod(colorTex, texCoord + params.offset * vec2(-2, -1), 0).rgb;
+    tmp_y     = textureLod(colorTex, texCoord + params.offset * vec2(-1, -1), 0).rgb;
+    tmp_x     = textureLod(colorTex, texCoord + params.offset * vec2( 0, -1), 0).rgb;
+    tmp_y    += textureLod(colorTex, texCoord + params.offset * vec2( 1, -1), 0).rgb;
+    tmp_w    += textureLod(colorTex, texCoord + params.offset * vec2( 2, -1), 0).rgb;
 
-  tmp  = textureLod(colorTex, texCoord + offset * vec2(0, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-2, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(0, 2), 0).rgb;
-  sum += tmp * exp_vec.z;
+    tmp_z    += textureLod(colorTex, texCoord + params.offset * vec2(-2,  0), 0).rgb;
+    tmp_x    += textureLod(colorTex, texCoord + params.offset * vec2(-1,  0), 0).rgb;
+    central   = textureLod(colorTex, texCoord, 0).rgb;
+    tmp_x    += textureLod(colorTex, texCoord + params.offset * vec2( 1,  0), 0).rgb;
+    tmp_z    += textureLod(colorTex, texCoord + params.offset * vec2( 2,  0), 0).rgb;
+    
+    tmp_w    += textureLod(colorTex, texCoord + params.offset * vec2(-2,  1), 0).rgb;
+    tmp_y    += textureLod(colorTex, texCoord + params.offset * vec2(-1,  1), 0).rgb;
+    tmp_x    += textureLod(colorTex, texCoord + params.offset * vec2( 0,  1), 0).rgb;
+    tmp_y    += textureLod(colorTex, texCoord + params.offset * vec2( 1,  1), 0).rgb;
+    tmp_w    += textureLod(colorTex, texCoord + params.offset * vec2( 2,  1), 0).rgb;
 
-  tmp  = textureLod(colorTex, texCoord + offset * vec2(-1, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-1, 1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, 1), 0).rgb;
-  sum += tmp * exp_vec.y;
+    tmp_last += textureLod(colorTex, texCoord + params.offset * vec2(-2, 2), 0).rgb;
+    tmp_w    += textureLod(colorTex, texCoord + params.offset * vec2(-1, 2), 0).rgb;
+    tmp_z    += textureLod(colorTex, texCoord + params.offset * vec2( 0, 2), 0).rgb;
+    tmp_w    += textureLod(colorTex, texCoord + params.offset * vec2( 1, 2), 0).rgb;
+    tmp_last += textureLod(colorTex, texCoord + params.offset * vec2( 2, 2), 0).rgb;
 
-  tmp  = textureLod(colorTex, texCoord + offset * vec2(0, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-1, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(0, 1), 0).rgb;
-  sum += tmp * exp_vec.x + textureLod(colorTex, texCoord, 0).rgb;
-  
-  color = vec4(sum / w, 1.0);
+    central += tmp_x * exp_vec.x + tmp_y * exp_vec.y + tmp_z * exp_vec.z + tmp_w * exp_vec.w + tmp_last * exp_last;
+    color = vec4(central / w, 1.0);
 }
-#endif
 
-#ifdef WINDOW7X7
 void blur7x7()
 {
-  const vec2 offset = vec2(dFdxFine(texCoord.x), dFdyFine(texCoord.y));
+    const vec4 exp_vec_first = exp(vec4(1.0, 2.0, 4.0, 5.0) * params.gaussian_divisor);
+    const vec4 exp_vec_second = exp(vec4(8.0, 9.0, 10.0, 13.0) * params.gaussian_divisor);
+    const float exp_last = exp(18.0 * params.gaussian_divisor);
+    const float w = 1.0 + 4.0 * (exp_vec_first.x + exp_vec_first.y + exp_vec_first.z
+                                + exp_vec_second.x + exp_vec_second.y + exp_last
+                                + 2.0 * (exp_vec_first.w + exp_vec_second.z + exp_vec_second.w));
 
-  const float exp_vec_first = exp(-0.5 / (sigma * sigma));
-  const vec4 exp_vec_second = exp(-vec4(1, 2, 2.5, 4) / (sigma * sigma));
-  const vec4 exp_vec_third = exp(-vec4(4.5, 5, 6.5, 9) / (sigma * sigma));
+    vec3 central, tmp_first_x, tmp_first_y, tmp_first_z, tmp_first_w,
+        tmp_last, tmp_second_x, tmp_second_y, tmp_second_z, tmp_second_w;
 
-  const float w = 1 + 4 * (exp_vec_first + exp_vec_second.x + exp_vec_second.y
-                  + exp_vec_second.w + exp_vec_third.x + exp_vec_third.w
-                  + 2 * (exp_vec_second.z + exp_vec_third.y + exp_vec_third.z));
+    tmp_last      = textureLod(colorTex, texCoord + params.offset * vec2(-3, -3), 0).rgb;
+    tmp_second_w  = textureLod(colorTex, texCoord + params.offset * vec2(-2, -3), 0).rgb;
+    tmp_second_z  = textureLod(colorTex, texCoord + params.offset * vec2(-1, -3), 0).rgb;
+    tmp_second_y  = textureLod(colorTex, texCoord + params.offset * vec2( 0, -3), 0).rgb;
+    tmp_second_z += textureLod(colorTex, texCoord + params.offset * vec2( 1, -3), 0).rgb;
+    tmp_second_w += textureLod(colorTex, texCoord + params.offset * vec2( 2, -3), 0).rgb;
+    tmp_last     += textureLod(colorTex, texCoord + params.offset * vec2( 3, -3), 0).rgb;
 
-  vec3 sum, tmp;
+    tmp_second_w += textureLod(colorTex, texCoord + params.offset * vec2(-3, -2), 0).rgb;
+    tmp_second_x  = textureLod(colorTex, texCoord + params.offset * vec2(-2, -2), 0).rgb;
+    tmp_first_w   = textureLod(colorTex, texCoord + params.offset * vec2(-1, -2), 0).rgb;
+    tmp_first_z   = textureLod(colorTex, texCoord + params.offset * vec2( 0, -2), 0).rgb;
+    tmp_first_w  += textureLod(colorTex, texCoord + params.offset * vec2( 1, -2), 0).rgb;
+    tmp_second_x += textureLod(colorTex, texCoord + params.offset * vec2( 2, -2), 0).rgb;
+    tmp_second_w += textureLod(colorTex, texCoord + params.offset * vec2( 3, -2), 0).rgb;
 
-  tmp  = textureLod(colorTex, texCoord + offset * vec2(-3, -3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(3, -3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-3, 3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(3, 3), 0).rgb;
-  sum = tmp * exp_vec_third.w;
+    tmp_second_z += textureLod(colorTex, texCoord + params.offset * vec2(-3, -1), 0).rgb;
+    tmp_first_w  += textureLod(colorTex, texCoord + params.offset * vec2(-2, -1), 0).rgb;
+    tmp_first_y   = textureLod(colorTex, texCoord + params.offset * vec2(-1, -1), 0).rgb;
+    tmp_first_x   = textureLod(colorTex, texCoord + params.offset * vec2( 0, -1), 0).rgb;
+    tmp_first_y  += textureLod(colorTex, texCoord + params.offset * vec2( 1, -1), 0).rgb;
+    tmp_first_w  += textureLod(colorTex, texCoord + params.offset * vec2( 2, -1), 0).rgb;
+    tmp_second_z += textureLod(colorTex, texCoord + params.offset * vec2( 3, -1), 0).rgb;
 
-  tmp = textureLod(colorTex, texCoord + offset * vec2(-2, -3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, -3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-3, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(3, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-3, 2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(3, 2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-2, 3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, 3), 0).rgb;
-  sum += tmp * exp_vec_third.z;
+    tmp_second_y += textureLod(colorTex, texCoord + params.offset * vec2(-3,  0), 0).rgb;
+    tmp_first_z  += textureLod(colorTex, texCoord + params.offset * vec2(-2,  0), 0).rgb;
+    tmp_first_x  += textureLod(colorTex, texCoord + params.offset * vec2(-1,  0), 0).rgb;
+    central       = textureLod(colorTex, texCoord, 0).rgb;
+    tmp_first_x  += textureLod(colorTex, texCoord + params.offset * vec2( 1,  0), 0).rgb;
+    tmp_first_z  += textureLod(colorTex, texCoord + params.offset * vec2( 2,  0), 0).rgb;
+    tmp_second_y += textureLod(colorTex, texCoord + params.offset * vec2( 3,  0), 0).rgb;
 
-  tmp = textureLod(colorTex, texCoord + offset * vec2(-1, -3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, -3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-3, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(3, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-3, 1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(3, 1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-1, 3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, 3), 0).rgb;
-  sum += tmp * exp_vec_third.y;
-  
-  tmp = textureLod(colorTex, texCoord + offset * vec2(0, -3), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-3, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(3, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(0, 3), 0).rgb;
-  sum += tmp * exp_vec_third.x;
-  
-  tmp = textureLod(colorTex, texCoord + offset * vec2(-2, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-2, 2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, 2), 0).rgb;
-  sum += tmp * exp_vec_second.w;
-  
-  tmp = textureLod(colorTex, texCoord + offset * vec2(-1, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-2, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-2, 1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, 1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-1, 2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, 2), 0).rgb;
-  sum += tmp * exp_vec_second.z;
+    tmp_second_z += textureLod(colorTex, texCoord + params.offset * vec2(-3,  1), 0).rgb;
+    tmp_first_w  += textureLod(colorTex, texCoord + params.offset * vec2(-2,  1), 0).rgb;
+    tmp_first_y  += textureLod(colorTex, texCoord + params.offset * vec2(-1,  1), 0).rgb;
+    tmp_first_x  += textureLod(colorTex, texCoord + params.offset * vec2( 0,  1), 0).rgb;
+    tmp_first_y  += textureLod(colorTex, texCoord + params.offset * vec2( 1,  1), 0).rgb;
+    tmp_first_w  += textureLod(colorTex, texCoord + params.offset * vec2( 2,  1), 0).rgb;
+    tmp_second_z += textureLod(colorTex, texCoord + params.offset * vec2( 3,  1), 0).rgb;
 
-  tmp = textureLod(colorTex, texCoord + offset * vec2(0, -2), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-2, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(2, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(0, 2), 0).rgb;
-  sum += tmp * exp_vec_second.y;
+    tmp_second_w += textureLod(colorTex, texCoord + params.offset * vec2(-3,  2), 0).rgb;
+    tmp_second_x += textureLod(colorTex, texCoord + params.offset * vec2(-2,  2), 0).rgb;
+    tmp_first_w  += textureLod(colorTex, texCoord + params.offset * vec2(-1,  2), 0).rgb;
+    tmp_first_z  += textureLod(colorTex, texCoord + params.offset * vec2( 0,  2), 0).rgb;
+    tmp_first_w  += textureLod(colorTex, texCoord + params.offset * vec2( 1,  2), 0).rgb;
+    tmp_second_x += textureLod(colorTex, texCoord + params.offset * vec2( 2,  2), 0).rgb;
+    tmp_second_w += textureLod(colorTex, texCoord + params.offset * vec2( 3,  2), 0).rgb;
 
-  tmp = textureLod(colorTex, texCoord + offset * vec2(-1, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-1, 1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, 1), 0).rgb;
-  sum += tmp * exp_vec_second.x;
-  
-  tmp = textureLod(colorTex, texCoord + offset * vec2(0, -1), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(-1, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(1, 0), 0).rgb;
-  tmp += textureLod(colorTex, texCoord + offset * vec2(0, 1), 0).rgb;
-  sum += tmp * exp_vec_first + textureLod(colorTex, texCoord, 0).rgb;
+    tmp_last     += textureLod(colorTex, texCoord + params.offset * vec2(-3,  3), 0).rgb;
+    tmp_second_w += textureLod(colorTex, texCoord + params.offset * vec2(-2,  3), 0).rgb;
+    tmp_second_z += textureLod(colorTex, texCoord + params.offset * vec2(-1,  3), 0).rgb;
+    tmp_second_y += textureLod(colorTex, texCoord + params.offset * vec2( 0,  3), 0).rgb;
+    tmp_second_z += textureLod(colorTex, texCoord + params.offset * vec2( 1,  3), 0).rgb;
+    tmp_second_w += textureLod(colorTex, texCoord + params.offset * vec2( 2,  3), 0).rgb;
+    tmp_last     += textureLod(colorTex, texCoord + params.offset * vec2( 3,  3), 0).rgb;
 
-  color = vec4(sum / w, 1.0);
+    central += tmp_first_x * exp_vec_first.x + tmp_first_y * exp_vec_first.y
+                + tmp_first_z * exp_vec_first.z + tmp_first_w * exp_vec_first.w
+                + tmp_second_x * exp_vec_second.x + tmp_second_y * exp_vec_second.y
+                + tmp_second_z * exp_vec_second.z + tmp_second_w * exp_vec_second.w
+                + tmp_last * exp_last;
+    color = vec4(central / w, 1.0);
 }
-#endif
 
 void main()
 {  
-  #ifdef WINDOW3X3
-    blur3x3();
-  #endif
-  #ifdef WINDOW5X5
-    blur5x5();
-  #endif
-  #ifdef WINDOW7X7
-    blur7x7();
-  #endif
+    if (WINDOW_R == 1)
+        blur3x3();
+    else if (WINDOW_R == 2)
+        blur5x5();
+    else if (WINDOW_R == 3)
+        blur7x7();
 }
