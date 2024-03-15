@@ -2,9 +2,9 @@
 
 layout(constant_id = 0) const int WORK_GROUP_AXIS_SIZE = 128;
 layout(constant_id = 1) const int WINDOW_R = 1;
-layout(constant_id = 2) const bool isVertical = true;
-
-layout(local_size_x_id = 0) in;
+layout(constant_id = 2) const int x_size = 128;
+layout(constant_id = 3) const int y_size = 1;
+layout(local_size_x_id = 2, local_size_y_id = 3) in;
 
 layout(push_constant) uniform params_t {
     ivec2 resolution;
@@ -20,7 +20,7 @@ shared vec3 window[WINDOW_LEN];
 void main() {
     ivec2 globalCoord = ivec2(gl_GlobalInvocationID.xy);
 
-    if (isVertical)
+    if (x_size == WORK_GROUP_AXIS_SIZE)
         globalCoord.x -= WINDOW_R;
     else
         globalCoord.y -= WINDOW_R;
@@ -28,7 +28,7 @@ void main() {
     window[gl_LocalInvocationIndex] = textureLod(srcImage, (globalCoord + 0.5) / params.resolution, 0).rgb;
     uint index = gl_LocalInvocationIndex + WORK_GROUP_AXIS_SIZE;
 
-    if (isVertical)
+    if (x_size == WORK_GROUP_AXIS_SIZE)
         globalCoord.x += WORK_GROUP_AXIS_SIZE;
     else
         globalCoord.y += WORK_GROUP_AXIS_SIZE;
@@ -43,7 +43,7 @@ void main() {
         float w = 0.5;
         for (int i = 1; i <= WINDOW_R; ++i) {
             float e = exp(i * i * params.gaussian_divisor);
-            resColor += (window[gl_LocalInvocationID.x + WINDOW_R - i] + window[gl_LocalInvocationID.x + WINDOW_R + i]) * e;
+            resColor += (window[gl_LocalInvocationIndex + WINDOW_R - i] + window[gl_LocalInvocationIndex + WINDOW_R + i]) * e;
             w += e;
         }
         w *= 2.0;
