@@ -67,7 +67,7 @@ void blur5x5()
     middleRow = isOdd.x ? texel_0 : texel_2;
     middleRow += texel_1;
     middleRow += dFdxFine(middleRow) * t.x;
-    middleRow = (texel_0 + texel_2) * exp_vec.z + texel_1 + middleRow * exp_vec_first.x;
+    middleRow = (texel_0 + texel_2) * exp_vec_first.z + texel_1 + middleRow * exp_vec_first.x;
 
     texel_0 = textureLod(colorTex, texCoord + params.offset * vec2(-2, 2), 0).rgb;
     texel_1 = textureLod(colorTex, texCoord + params.offset * vec2( 0, 2), 0).rgb;
@@ -79,7 +79,7 @@ void blur5x5()
 
     texel_0 = topRow + middleRow + bottomRow;
     topRow = (isOdd.y ? topRow : bottomRow) * exp_vec_second.y;
-    topRow += middleRow * exp_vec.x;
+    topRow += middleRow * exp_vec_first.x;
     topRow += dFdyFine(topRow) * t.y;
 
     color= vec4((texel_0 + topRow) / w, 1.0);
@@ -147,13 +147,10 @@ void blur7x7()
 
 void main()
 {
-  #ifdef WINDOW3X3
-    blur3x3();
-  #endif
-  #ifdef WINDOW5X5
-    blur5x5();
-  #endif
-  #ifdef WINDOW7X7
-    blur7x7();
-  #endif
+    if (WINDOW_R == 1)
+        blur3x3();
+    else if (WINDOW_R == 2)
+        blur5x5();
+    else if (WINDOW_R == 3)
+        blur7x7();
 }

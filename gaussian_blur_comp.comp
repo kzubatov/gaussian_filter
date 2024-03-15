@@ -7,7 +7,7 @@ layout(constant_id = 2) const bool isVertical = true;
 layout(local_size_x_id = 0) in;
 
 layout(push_constant) uniform params_t {
-    vec2 resolution;
+    ivec2 resolution;
     float gaussian_divisor;
 } params;
 
@@ -18,7 +18,7 @@ const int WINDOW_LEN = WORK_GROUP_AXIS_SIZE + 2 * WINDOW_R;
 shared vec3 window[WINDOW_LEN];
 
 void main() {
-    ivec2 globalCoord = gl_GlobalInvocationID.xy;
+    ivec2 globalCoord = ivec2(gl_GlobalInvocationID.xy);
 
     if (isVertical)
         globalCoord.x -= WINDOW_R;
@@ -26,7 +26,7 @@ void main() {
         globalCoord.y -= WINDOW_R;
 
     window[gl_LocalInvocationIndex] = textureLod(srcImage, (globalCoord + 0.5) / params.resolution, 0).rgb;
-    int index = gl_LocalInvocationIndex + WORK_GROUP_AXIS_SIZE;
+    uint index = gl_LocalInvocationIndex + WORK_GROUP_AXIS_SIZE;
 
     if (isVertical)
         globalCoord.x += WORK_GROUP_AXIS_SIZE;
@@ -38,7 +38,7 @@ void main() {
 
     barrier();
 
-    if (all(lessThan(gl_GlobalInvocationID.xy < PushConstant.resolution))) {
+    if (all(lessThan(gl_GlobalInvocationID.xy, params.resolution))) {
         vec3 resColor = window[gl_LocalInvocationIndex + WINDOW_R];
         float w = 0.5;
         for (int i = 1; i <= WINDOW_R; ++i) {

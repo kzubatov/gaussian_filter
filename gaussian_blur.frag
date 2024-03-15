@@ -18,17 +18,17 @@ void blur3x3()
     vec3 tmp_x, tmp_y; // for exp_vec.x and y parts;
     vec3 central;
 
-    tmp_y  = textureLod(colorTex, texCoord + params.offset * vec2(-1, -1), 0).rgb;
-    tmp_x  = textureLod(colorTex, texCoord + params.offset * vec2( 0, -1), 0).rgb;
-    tmp_y += textureLod(colorTex, texCoord + params.offset * vec2( 1, -1), 0).rgb;
+    tmp_y   = textureLod(colorTex, texCoord + params.offset * vec2(-1, -1), 0).rgb;
+    tmp_x   = textureLod(colorTex, texCoord + params.offset * vec2( 0, -1), 0).rgb;
+    tmp_y  += textureLod(colorTex, texCoord + params.offset * vec2( 1, -1), 0).rgb;
     
-    tmp_x += textureLod(colorTex, texCoord + params.offset * vec2(-1,  0), 0).rgb;
-    sum    = textureLod(colorTex, texCoord, 0).rgb;
-    tmp_x += textureLod(colorTex, texCoord + params.offset * vec2( 1,  0), 0).rgb;
+    tmp_x  += textureLod(colorTex, texCoord + params.offset * vec2(-1,  0), 0).rgb;
+    central = textureLod(colorTex, texCoord, 0).rgb;
+    tmp_x  += textureLod(colorTex, texCoord + params.offset * vec2( 1,  0), 0).rgb;
     
-    tmp_y += textureLod(colorTex, texCoord + params.offset * vec2(-1,  1), 0).rgb;
-    tmp_x += textureLod(colorTex, texCoord + params.offset * vec2( 0,  1), 0).rgb;
-    tmp_y += textureLod(colorTex, texCoord + params.offset * vec2( 1,  1), 0).rgb;
+    tmp_y  += textureLod(colorTex, texCoord + params.offset * vec2(-1,  1), 0).rgb;
+    tmp_x  += textureLod(colorTex, texCoord + params.offset * vec2( 0,  1), 0).rgb;
+    tmp_y  += textureLod(colorTex, texCoord + params.offset * vec2( 1,  1), 0).rgb;
     
     central += tmp_x * exp_vec.x + tmp_y * exp_vec.y;
     color = vec4(central / w, 1.0);
