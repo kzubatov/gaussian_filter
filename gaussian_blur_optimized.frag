@@ -137,8 +137,8 @@ void blur7x7()
     row_3 += (texel_0 + texel_3) * exp_vec_third.x + (texel_1 + texel_2) * exp_vec_second.z;
 
     texel_0 = row_0 + row_1 + row_2 + row_3;
-    texel_1 = (isOdd.y ? row_0 : row_3) * exp_vec_third.w;
-    texel_1 += (isOdd.y ? row_1 : row_2) * exp_vec_third.z;
+    texel_1 = (isOdd.y ? row_0 : row_3) / exp_vec_first.w;
+    texel_1 += (isOdd.y ? row_1 : row_2) / exp_vec_first.x;
     texel_1 += (isOdd.y ? row_2 : row_1) * exp_vec_third.y;
     texel_1 += dFdyFine(texel_1) * t.y;
     
